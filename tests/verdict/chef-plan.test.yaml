@@ -1,0 +1,247 @@
+# chef-plan.test.yaml
+#
+# Tests for the chef:plan skill.
+# Key behaviors:
+#   - Proposes 3-5 opinionated recipes with clear rationale
+#   - Handles "surprise me" by picking without asking
+#   - Respects existing menu context (no overlap with locked dishes)
+#   - Outputs full recipe with grouped ingredients (metric) + sensory cues + shopping list
+#   - Asks inline for missing config, doesn't block and redirect to chef:configure
+
+description: chef:plan — recipe proposal, context awareness, and full recipe output
+
+requires:
+  skills: [chef:plan]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  # ── Proposal quality ──────────────────────────────────────────────────────
+
+  - description: "proposes 3-5 recipes with rationale when given enough context"
+    vars:
+      # Provide enough context so the skill should propose rather than ask
+      prompt: "Italian dinner for 2 tonight, about an hour, intermediate cook"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response proposes between 3 and 5 distinct recipe options"
+      - type: llm-rubric
+        value: "Each recipe includes a time estimate"
+      - type: llm-rubric
+        value: "Response clearly recommends one option and explains why"
+      - type: javascript
+        value: "!output.includes('[TOOL_CALL] AskUserQuestion')"
+
+  - description: "asks inline for missing info rather than blocking on chef:configure"
+    vars:
+      prompt: "plan me a weeknight dinner"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response proceeds to propose recipes or asks a quick inline question — it does NOT tell the user to run chef:configure first"
+      - type: javascript
+        value: "!output.toLowerCase().includes('chef:configure')"
+
+  # ── "Surprise me" ────────────────────────────────────────────────────────
+
+  - description: "picks a recipe without asking when user says surprise me"
+    vars:
+      prompt: "Surprise me — dinner for 2, about 45 minutes, intermediate cook, no restrictions"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response picks a dish and commits to it — it does NOT ask the user to choose between options"
+      - type: llm-rubric
+        value: "Response includes a list of ingredients for the chosen dish"
+      - type: javascript
+        value: "!output.includes('[TOOL_CALL] AskUserQuestion')"
+
+  # ── Menu context awareness (inspired by the dinner party session) ─────────
+
+  - description: "proposes dishes that complement locked-in menu items, no overlap"
+    vars:
+      prompt: >
+        Planning a fancy dinner party for 8, no dietary restrictions, intermediate cook,
+        3 hours available. Tiradito and aguachile are already locked in — both are cold,
+        acidic, raw seafood dishes. What else should I make as a main?
+        South American or Mexican cuisine preferred.
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response proposes warm dishes, not additional raw or cold seafood dishes"
+      - type: llm-rubric
+        value: "Response explains why each proposal contrasts well with tiradito and aguachile (e.g. warm, rich, or textural contrast)"
+      - type: llm-rubric
+        value: "At least one proposal involves a complex sauce or braised protein (e.g. mole, duck, birria, short rib)"
+
+  - description: "respects constraint that a friend is already making birria"
+    vars:
+      prompt: >
+        Dinner party for 6, no dietary restrictions — Mexican/South American theme.
+        My friend is making birria. I want to make a main dish that doesn't compete
+        with birria (rich, braised, heavy). I also have tiradito and aguachile as
+        starters. What should I make?
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response does NOT propose birria or a dish with an identical flavor profile (e.g. another heavy braised chili stew)"
+      - type: llm-rubric
+        value: "Response proposes something that contrasts with birria — a lighter protein, a grilled dish, or a fish dish (chicken, fish, or similar are all valid — it just shouldn't be another heavy braised meat)"
+      - type: llm-rubric
+        value: "Response acknowledges why the proposal avoids overlapping with birria"
+
+  # ── Full recipe output quality ────────────────────────────────────────────
+
+  - description: "full recipe output after selection includes grouped ingredients in metric"
+    vars:
+      prompt: "Give me a full recipe for duck breast with mole sauce, dinner for 4"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Recipe groups ingredients by category (e.g. Protein, Pantry, Herbs & Spices)"
+      - type: llm-rubric
+        value: "Measurements are in metric units (g, mL, kg) with practical equivalents where helpful"
+      - type: llm-rubric
+        value: "Instructions include sensory or visual cues (e.g. 'until golden', 'until the skin pulls away easily', 'smells nutty')"
+      - type: llm-rubric
+        value: "Instructions include timing cues (e.g. '6-8 minutes', 'after 5 minutes')"
+      - type: llm-rubric
+        value: "Recipe includes a tips or common mistakes section"
+
+  - description: "shopping list is included after the recipe"
+    vars:
+      prompt: "Full recipe for mole duck breast for 2 people please"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response includes a shopping list section after the recipe"
+      - type: llm-rubric
+        value: "Shopping list groups items by category (e.g. Produce, Protein, Pantry)"
+      - type: llm-rubric
+        value: "Shopping list does NOT include basic pantry staples like salt or olive oil"
+
+  - description: "temperatures always include both °F and °C"
+    vars:
+      prompt: "Recipe for roasted chicken thighs for 4"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Any oven or internal temperature mentioned includes both °F and °C — either format is fine (e.g. '400°F (200°C)' or '200°C / 400°F') but both units must appear"
+
+  # ── Override and constraint handling ─────────────────────────────────────
+
+  - description: "budget constraint — keeps ingredient list affordable"
+    vars:
+      prompt: "Weeknight dinner for 2, keep it under $20 total ingredients, 45 minutes, intermediate, no restrictions"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response does NOT propose expensive proteins like lobster, wagyu, duck, or rack of lamb as the main"
+      - type: llm-rubric
+        value: "Proposals acknowledge the budget constraint — either explicitly note affordability or lean on pantry staples, eggs, pasta, legumes, or inexpensive cuts"
+
+  - description: "advanced cook — proposals genuinely challenge, not dumbed down"
+    vars:
+      prompt: "I'm an advanced cook. Give me something technically challenging for dinner for 2 tonight, 2 hours."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "At least one proposal involves a genuinely advanced technique — e.g. emulsified sauce, tempering, dry-aging, sous vide concept, making a roux-based sauce, butchering, laminated dough, or a multi-component dish"
+      - type: llm-rubric
+        value: "Response does NOT propose beginner-level dishes like pasta with jarred sauce, roasted vegetables, or simple stir-fry as the challenging option"
+
+  - description: "combined dietary constraints — strictly respects both"
+    vars:
+      prompt: "Dinner for 4, vegetarian AND no nuts (severe allergy). 1 hour, intermediate cook."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "ALL proposals are vegetarian — no meat, fish, or poultry anywhere"
+      - type: llm-rubric
+        value: "No proposal includes nuts or nut-based ingredients (no peanuts, almonds, cashews, tahini, pesto with pine nuts, satay sauce, or similar) — the nut allergy is treated as a hard constraint"
+
+  # ── Skill level matching ──────────────────────────────────────────────────
+
+  - description: "proposed recipes match stated skill level"
+    vars:
+      prompt: "I'm a beginner cook. What should I make for a romantic dinner for 2?"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "All proposed recipes are labeled beginner or intermediate difficulty — none are labeled advanced"
+      - type: llm-rubric
+        value: "Proposed recipes do not require advanced techniques like tempering chocolate, making emulsified sauces from scratch, or butchering whole proteins"

@@ -1,0 +1,51 @@
+# chef-configure.test.yaml
+#
+# Tests for the chef:configure skill.
+#
+# SANDBOX LIMITATION: verdict blocks writes to ~/.claude/ — when the skill
+# tries to save the config it gets a permission error, which causes non-deterministic
+# model responses. Tests here focus on behaviors that don't depend on write success:
+# asking for fields and mentioning the file path.
+#
+# Manual test for write/update behavior:
+#   /chef:configure                               → should ask all 6 fields
+#   /chef:configure [just change location to X]  → should only update location
+
+description: chef:configure — profile setup behavior
+
+requires:
+  skills: [chef:configure]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  - description: "first run — starts the configuration process (asks for fields)"
+    vars:
+      prompt: "Set up my chef profile"
+      mode: inject
+      skill: chef:configure
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response starts the configuration process — either asks about one or more fields, or presents a config template to fill in"
+      - type: llm-rubric
+        value: "Response does NOT tell the user to skip setup or edit the file in some other way as the only option"
+
+  - description: "target file path is mentioned"
+    vars:
+      prompt: "Configure my cooking profile: Montreal QC, IGA and Metro, no restrictions, 2 people, French and Italian, intermediate"
+      mode: inject
+      skill: chef:configure
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response mentions ~/.claude/chef/config.md or a similar ~/.claude/chef/ path at some point (either when describing what it's saving or in an error/approval message)"

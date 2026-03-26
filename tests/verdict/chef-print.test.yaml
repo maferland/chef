@@ -1,0 +1,104 @@
+# chef-print.test.yaml
+#
+# Tests for file saving behavior in chef:plan and the chef:print skill.
+# Key behaviors:
+#   - chef:plan saves 3 separate files (plan.md, timeline.md, shopping.md)
+#   - timeline.md has prep-ahead items visually distinct at the top
+#   - shopping.md is grouped by store, not category
+#   - chef:print generates PDFs using Chrome headless
+
+description: chef:plan file saving + chef:print PDF generation
+
+requires:
+  skills: [chef:plan, chef:print]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  # ── File saving ──────────────────────────────────────────────────────────
+
+  - description: "chef:plan describes the 3-file output structure"
+    vars:
+      # Focused prompt — just ask about the file structure, not a full recipe
+      prompt: "What files does chef:plan save and where does it save them?"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response describes saving to a sessions/ folder"
+      - type: llm-rubric
+        value: "Response names all three output files: plan.md, timeline.md, and shopping.md (or equivalent descriptions)"
+
+  - description: "timeline.md has prep-ahead section visually distinct from day-of tasks"
+    vars:
+      prompt: >
+        Generate just the timeline for a Mexican dinner party where I'm making duck mole
+        (made day before), and churros (dough made day before, fried at service).
+        Save it as a timeline file.
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Timeline has a clearly labelled prep-ahead section (e.g. 'Prep Ahead', 'Day Before') that is visually separate from the day-of tasks"
+      - type: llm-rubric
+        value: "Prep-ahead section notes WHY each task benefits from being done early (not just lists the tasks)"
+
+  - description: "shopping.md is grouped by store, not by ingredient category"
+    vars:
+      prompt: >
+        Shopping list for: 5 duck breasts (butcher), dried ancho + mulato + pasilla chiles
+        (Épicerie Latina), frozen corn + sour cream + chocolate (Metro), wine (SAQ).
+        Save as shopping list.
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Shopping list groups items by store (butcher, Épicerie Latina, Metro, SAQ) — NOT by category (produce, protein, dairy)"
+
+  # ── chef:print ────────────────────────────────────────────────────────────
+
+  - description: "chef:print references print.sh with correct arguments"
+    vars:
+      prompt: "Print the shopping list and timeline from the most recent session"
+      mode: inject
+      skill: chef:print
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response either references the print script (print.sh) OR describes running a command (bash/Chrome/HTML) to generate print files from the sessions/ folder"
+      - type: llm-rubric
+        value: "Response targets both shopping and timeline files (or 'all')"
+
+  - description: "chef:print falls back gracefully if no session exists"
+    vars:
+      prompt: "Print my shopping list"
+      mode: inject
+      skill: chef:print
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response either finds a session to print OR explains clearly that no sessions folder was found and what to do next — it does not crash silently"

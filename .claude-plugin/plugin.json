@@ -1,0 +1,11 @@
+{
+  "name": "chef",
+  "version": "1.0.0",
+  "description": "Meal planning assistant — plan recipes, source culinary inspiration, and generate shopping lists",
+  "author": {
+    "name": "Marc-Antoine Ferland",
+    "email": "me@maferland.com"
+  },
+  "license": "MIT",
+  "keywords": ["cooking", "recipes", "meal-planning", "food", "quebec"]
+}
