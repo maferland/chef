@@ -26,14 +26,14 @@ Then enable: `chef@chef-marketplace`
 ## Usage
 
 ```
-/chef:init
-```
-Run once after installing. Creates `~/.claude/chef/config.md` with defaults — edit it or follow up with `/chef:configure`.
-
-```
 /chef:configure
 ```
-Interactively update any config field. Saved to `~/.claude/chef/config.md`.
+Set up or update your profile — location, dietary restrictions, skill level, preferred stores. Works on first run (creates the file) and for any future changes. Saved to `~/.claude/chef/config.md`.
+
+```
+/chef:init
+```
+Quick bootstrap — writes a config template with placeholders you can fill in manually, without going through the interactive flow.
 
 ```
 /chef:plan weeknight dinner for 2, 45min, Italian
