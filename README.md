@@ -30,10 +30,6 @@ Then enable: `chef@chef-marketplace`
 ```
 Set up or update your profile — location, dietary restrictions, skill level, preferred stores. Works on first run (creates the file) and for any future changes. Saved to `~/.claude/chef/config.md`.
 
-```
-/chef:init
-```
-Quick bootstrap — writes a config template with placeholders you can fill in manually, without going through the interactive flow.
 
 ```
 /chef:plan weeknight dinner for 2, 45min, Italian
