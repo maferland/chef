@@ -1,0 +1,8 @@
+sessions/
+*.pdf
+
+.DS_Store
+.verdict-logs/
+.verdict-history.json
+.verdict-runs/
+.claude/

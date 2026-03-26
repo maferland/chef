@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  print-script:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test print.sh with sample session
+        run: |
+          mkdir -p /tmp/chef-ci-test
+          cat > /tmp/chef-ci-test/shopping.md << 'EOF'
+          # Shopping List — Test
+          **Date:** 2026-01-01 · **Guests:** 2
+
+          ## Metro
+          - [ ] Test item 1
+          - [ ] Test item 2
+          EOF
+
+          cat > /tmp/chef-ci-test/timeline.md << 'EOF'
+          # Day-of Timeline — Test
+          **Date:** 2026-01-01
+
+          ---
+
+          ## ⭐ Prep Ahead
+          *Do these before the day.*
+
+          - [ ] **Task 1** — reason
+
+          ## Day of
+
+          ### 1h before
+          - [ ] Task 2
+          EOF
+
+          bash skills/print/scripts/print.sh /tmp/chef-ci-test/ all
+
+          # Chrome won't be available in CI — expect HTML fallback
+          ls /tmp/chef-ci-test/*.html || ls /tmp/chef-ci-test/*.pdf

@@ -1,0 +1,89 @@
+# chef-source.test.yaml
+#
+# Tests for the chef:source skill.
+# Key behaviors:
+#   - Performs web research (WebSearch + WebFetch) for the subject
+#   - Produces a structured inspiration brief with all required sections
+#   - Ends with an actionable "Suggested Direction for chef:plan"
+#   - Handles obscure subjects gracefully
+
+description: chef:source — web research and inspiration brief output
+
+requires:
+  skills: [chef:source]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  # ── Structured output ─────────────────────────────────────────────────────
+
+  - description: "produces structured brief with all required sections"
+    vars:
+      prompt: "Research Pujol restaurant, Mexico City"
+      mode: real
+      env:
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+    assert:
+      - type: llm-rubric
+        value: "Response includes an Identity or overview section describing the restaurant's philosophy and what makes it distinctive"
+      - type: llm-rubric
+        value: "Response includes a section on signature dishes or key menu elements"
+      - type: llm-rubric
+        value: "Response includes a section on flavor profiles or taste direction"
+      - type: llm-rubric
+        value: "Response includes a section on key techniques"
+      - type: llm-rubric
+        value: "Response ends with a 'Suggested Direction for chef:plan' section (or equivalent) that tells the user how to turn the research into a meal"
+
+  - description: "includes home cook adaptation notes"
+    vars:
+      prompt: "Research Pujol restaurant in Mexico City for cooking inspiration"
+      mode: real
+      env:
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+    assert:
+      - type: llm-rubric
+        value: "Response distinguishes between techniques or elements a home cook can realistically replicate vs those that require restaurant equipment or professional skill"
+
+  - description: "Contramar research captures seafood and tostada focus"
+    vars:
+      prompt: "Source inspiration from Contramar restaurant Mexico City"
+      mode: real
+      env:
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+    assert:
+      - type: llm-rubric
+        value: "Response mentions seafood, fish, or tostadas as central to the restaurant's identity"
+      - type: llm-rubric
+        value: "Response includes at least 2 signature dishes or techniques associated with Contramar"
+
+  # ── Cuisine style (no specific restaurant) ───────────────────────────────
+
+  - description: "cuisine style source returns actionable flavor and technique direction"
+    vars:
+      prompt: "Source: modern Peruvian-Japanese fusion (Nikkei cuisine)"
+      mode: real
+      env:
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+    assert:
+      - type: llm-rubric
+        value: "Response describes the Nikkei culinary tradition (Japanese immigration to Peru influencing local cuisine)"
+      - type: llm-rubric
+        value: "Response lists specific ingredients or flavor pairings characteristic of Nikkei cuisine (e.g. aji amarillo, yuzu, leche de tigre, miso)"
+      - type: llm-rubric
+        value: "Response includes a Suggested Direction section pointing toward chef:plan"
+
+  # ── Graceful degradation ──────────────────────────────────────────────────
+
+  - description: "obscure subject — acknowledges low signal and offers alternatives"
+    vars:
+      prompt: "Source: Le Petit Bistrot de la Rue du Moulin, Trois-Rivières"
+      mode: real
+      env:
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+    assert:
+      - type: llm-rubric
+        value: "If the restaurant cannot be found online, the response clearly says so rather than fabricating menu items"
+      - type: llm-rubric
+        value: "Response offers an adjacent alternative (e.g. researching Québécois bistro cuisine broadly, or a similar well-known restaurant)"

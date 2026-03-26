@@ -1,0 +1,209 @@
+# chef-pair.test.yaml
+#
+# Tests for the chef:pair skill (standalone) and pairing integration in chef:plan.
+# Key behaviors:
+#   - Always includes 3 pairings: primary, alt, non-alcoholic
+#   - Primary matches occasion (junk food → beer/cocktail, fine dining → wine)
+#   - Specific names, not generic categories
+#   - One sentence explaining why each pairing works
+
+description: chef:pair — drink pairing quality and occasion awareness
+
+requires:
+  skills: [chef:pair, chef:plan]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  # ── Standalone chef:pair ──────────────────────────────────────────────────
+
+  - description: "always includes primary, alt, and non-alcoholic"
+    vars:
+      prompt: "What should I drink with duck breast and mole negro?"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response includes exactly three pairing suggestions: a primary, an alternative, and a non-alcoholic option"
+      - type: llm-rubric
+        value: "Each pairing includes a specific name (e.g. 'Côtes du Rhône rouge', not just 'red wine') AND one sentence explaining why it works with the dish"
+
+  - description: "fine dining context → wine as primary"
+    vars:
+      prompt: "Pairing for duck breast with mole negro, fancy dinner party for 6"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Primary pairing is a wine (not beer or cocktail) — appropriate for a fancy dinner party context"
+      - type: llm-rubric
+        value: "Reasoning for the primary wine mentions at least one flavor characteristic that connects it to the dish (e.g. earthy, tannic, acidic, peppery)"
+
+  - description: "junk food context → beer or cocktail as primary"
+    vars:
+      prompt: "What should we drink with fancy smash burgers and truffle fries? Casual night."
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Primary pairing is a beer or cocktail — NOT wine — matching the casual junk food occasion"
+      - type: llm-rubric
+        value: "Non-alcoholic option is included and is specific — not just 'water' or 'juice' with no character (a craft soda, house-made drink, flavored sparkling water with a creative twist, or similar all count)"
+
+  - description: "poutine gets a Quebec-appropriate pairing"
+    vars:
+      prompt: "Drink pairing for elevated poutine — fancy version with short rib and homemade gravy"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response suggests at least one pairing that works with rich, heavy comfort food (e.g. something that cuts fat, provides contrast, or has enough body to hold up)"
+      - type: llm-rubric
+        value: "Non-alcoholic option is interesting and specific — not just 'water' or 'juice'"
+
+  - description: "primary and alt are meaningfully different styles"
+    vars:
+      prompt: "Pair something with tiradito (raw fish, leche de tigre, aji amarillo)"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Primary and alternative pairings are from different drink categories or meaningfully different styles — not two similar wines or two similar beers"
+
+  - description: "brunch context → low-ABV or festive pairing, not a full red wine"
+    vars:
+      prompt: "Pairing for eggs benedict with hollandaise, Sunday brunch for 4"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Primary pairing is brunch-appropriate — e.g. mimosa, Aperol Spritz, Bloody Mary, sparkling wine, light white wine — NOT a heavy tannic red or a full-pour whisky/bourbon neat"
+      - type: llm-rubric
+        value: "Response acknowledges the richness of hollandaise and suggests something that contrasts or complements it (acidity, bubbles, or freshness)"
+
+  - description: "spicy dish → pairing cuts the heat rather than amplifying it"
+    vars:
+      prompt: "What to drink with a Thai green curry — lots of chili, coconut milk, lime"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Primary pairing is something that mitigates or balances heat — e.g. off-dry Riesling, light lager, coconut water — NOT a tannic red or high-ABV spirit that would amplify the burn"
+      - type: llm-rubric
+        value: "Response explains WHY the pairing works with spicy food (sweetness, carbonation, dairy, or light body)"
+
+  - description: "non-alcoholic only preference → all three options are alcohol-free"
+    vars:
+      prompt: "Non-alcoholic only pairings for duck confit, dinner party, nobody is drinking tonight"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "ALL suggested pairings are non-alcoholic — no wine, beer, or cocktail is recommended"
+      - type: llm-rubric
+        value: "Non-alcoholic options are varied and thoughtful (not three variations of sparkling water) — e.g. shrubs, kombucha, NA wine, craft soda, tea-based drinks"
+
+  - description: "chocolate dessert → suggests something sweet, fortified, or digestif"
+    vars:
+      prompt: "Pair a drink with dark chocolate lava cake with chili and sea salt"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Primary pairing is appropriate for dessert — e.g. port, Banyuls, espresso martini, Pedro Ximénez sherry, Amaretto, or a sweet digestif — NOT a dry white wine or light lager"
+      - type: llm-rubric
+        value: "Response engages with the chili element — suggests something that echoes the spice or at least doesn't clash with it"
+
+  - description: "full menu pairing — one suggestion per course"
+    vars:
+      prompt: "We're doing a 3-course Mexican dinner: aguachile to start, duck mole as main, churros for dessert. What do we drink throughout?"
+      mode: inject
+      skill: chef:pair
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response addresses the full meal progression — suggests different drinks for different courses, or a single pairing with notes on how it evolves across courses"
+      - type: llm-rubric
+        value: "The aguachile pairing is something bright, acidic, or zippy (not the same style as the mole pairing)"
+
+  # ── Pairing integration in chef:plan ─────────────────────────────────────
+
+  - description: "chef:plan recipe output always includes a drink pairing section"
+    vars:
+      prompt: "Full recipe for duck breast with mole for 2, intermediate cook"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Recipe output includes a Drink Pairing section (or equivalent heading) with at least 2 distinct drink suggestions"
+      - type: llm-rubric
+        value: "Drink Pairing section appears after the recipe instructions and before or alongside the shopping list"
+
+  - description: "chef:plan junk food recipe gets beer/cocktail pairing, not wine"
+    vars:
+      prompt: "Full recipe for fancy smash burgers for 2, casual night, no restrictions, intermediate"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Drink pairing in the recipe output leads with beer or a cocktail, not wine — matching the casual burger occasion"

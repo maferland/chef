@@ -1,0 +1,292 @@
+# chef-plan-scenarios.test.yaml
+#
+# Extended scenario tests for chef:plan.
+# Covers themed evenings, creative constraints, dietary variations,
+# and edge cases that reveal how well the skill handles creative tension.
+
+description: chef:plan — themed scenarios and creative constraints
+
+requires:
+  skills: [chef:plan]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  # ── Fancy junk food night ─────────────────────────────────────────────────
+
+  - description: "fancy junk food — proposes elevated comfort food, not health food or fine dining"
+    vars:
+      prompt: "Fancy junk food night for 4, no restrictions, intermediate cook, 2 hours"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response proposes elevated versions of comfort or junk food (e.g. smash burgers, gourmet fries, elevated nachos, fancy hot dogs, loaded poutine, gourmet pizza) — NOT salads, grain bowls, or classic fine dining dishes"
+      - type: llm-rubric
+        value: "Proposals acknowledge the 'fancy' angle — at least one dish includes an upscale element like duck fat, wagyu, truffle, homemade buns, aged cheese, compound butter, or house-made sauce"
+      - type: llm-rubric
+        value: "Response recommends one option and explains why it hits the junk food + fancy balance"
+
+  - description: "fancy junk food — does NOT default to normal dinner party food"
+    vars:
+      prompt: "We want elevated junk food tonight. Think Michelin-starred fast food vibes. Dinner for 2, 1.5 hours, intermediate."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response does NOT propose dishes like beef bourguignon, roasted chicken, pasta primavera, or other conventional dinner party food with no junk food connection"
+      - type: llm-rubric
+        value: "Response engages with the 'fast food elevated' concept — proposals feel fun and indulgent, not just healthy or refined"
+
+  - description: "fancy junk food — smash burger proposal includes technique and elevation"
+    vars:
+      prompt: "Fancy smash burger night for 2, no restrictions, intermediate, 45 minutes. What are my options and what would you recommend?"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "At least one proposal mentions the smash technique or a specific smash burger concept"
+      - type: llm-rubric
+        value: "At least one proposal includes an elevated element beyond a basic burger — e.g. aged or fancy cheese, house sauce, brioche bun, caramelized onions, duck fat, or wagyu beef"
+      - type: llm-rubric
+        value: "Response recommends at least one specific option and gives a reason why it best hits the fancy junk food goal"
+
+  - description: "fancy poutine — Quebec classic elevated"
+    vars:
+      prompt: "Elevated poutine for 4 people. Make it special. Intermediate cook, 2 hours, no restrictions."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response engages seriously with the poutine concept — not dismissive of it as 'too simple'"
+      - type: llm-rubric
+        value: "At least one proposal elevates a component: homemade gravy from scratch, duck confit or short rib instead of plain fries, high-quality curds, or a truffle/foie variation"
+      - type: llm-rubric
+        value: "Response mentions making the gravy or fries from scratch rather than using packaged gravy"
+
+  - description: "fancy junk food multi-course — covers starter, main, and dessert"
+    vars:
+      prompt: "Fancy junk food dinner party for 6, no restrictions, 3 hours, advanced cook. Plan a full menu with a starter, main, and dessert — all elevated junk food."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response covers at least three courses: a starter or snack, a main dish, and a dessert"
+      - type: llm-rubric
+        value: "The proposed dishes are recognizably comfort food or junk food elevated — not purely classical fine dining plates"
+      - type: llm-rubric
+        value: "The dessert is indulgent (e.g. fancy ice cream, elevated churros, gourmet s'mores, loaded sundae) — not a purely classical French pâtisserie"
+
+  # ── More themed evenings ─────────────────────────────────────────────────
+
+  - description: "date night — romantic, impressive but not chaotic to execute"
+    vars:
+      prompt: "Date night dinner for 2, intermediate cook, 1.5 hours. Want to impress but not stress out mid-service."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Proposals are romantic and impressive — not a Tuesday weeknight pasta, not a 4-course restaurant menu that requires 3 pans going at once"
+      - type: llm-rubric
+        value: "At least one proposal includes a note about what can be prepped ahead — helping the cook not be in the kitchen the whole time during the date"
+
+  - description: "Sunday brunch — appropriate dishes, not dinner food"
+    vars:
+      prompt: "Sunday brunch for 4 people, intermediate cook, 1 hour, no restrictions"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Proposals are brunch-appropriate — eggs, bread, pastries, light proteins, fruit — NOT dinner dishes like roast chicken, pasta, or braised meat"
+      - type: llm-rubric
+        value: "At least one proposal is a classic elevated brunch dish (e.g. eggs benedict, shakshuka, French toast, frittata, avocado toast with extras)"
+
+  - description: "leftover roast chicken — uses the specific ingredient provided"
+    vars:
+      prompt: "I have half a leftover roast chicken from yesterday. Dinner for 2, 30 minutes, no restrictions, intermediate."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "All proposed recipes use the leftover chicken as the main protein — none suggest buying a new protein"
+      - type: llm-rubric
+        value: "At least one proposal takes advantage of the fact that the chicken is already cooked (quick assembly, sauce-based, or transformed dish like a hash, sandwich, or soup)"
+
+  # ── Other creative scenarios ──────────────────────────────────────────────
+
+  - description: "pantry raid — flags ingredients needed but not in the list"
+    vars:
+      # Deliberately sparse pantry — any interesting recipe will need something extra,
+      # forcing the skill to ask about missing items rather than silently including them
+      prompt: >
+        Pantry raid dinner — I literally only have: eggs, butter, one lemon, and some dried thyme.
+        Dinner for 2, no restrictions, intermediate cook. What can I make?
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response acknowledges the very limited pantry — it does NOT propose a recipe that requires major unlisted ingredients (pasta, meat, vegetables, cheese, etc.) without flagging them with a question like 'do you have X?' or 'this would need X — do you have any?'"
+      - type: llm-rubric
+        value: "Response does NOT present complex multi-ingredient recipes as fully doable from this pantry without noting what's missing"
+
+  - description: "vegetarian dinner party — no meat, still impressive"
+    vars:
+      prompt: "Vegetarian dinner party for 4, fancy occasion, intermediate cook, 2 hours. No meat, fish, or poultry."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "All proposed dishes are vegetarian — no meat, fish, or poultry in any proposal"
+      - type: llm-rubric
+        value: "Proposals feel dinner-party worthy, not like an afterthought — at least one involves a technique that elevates vegetables (e.g. reduction, roasting, stuffing, gratinating)"
+
+  - description: "30-minute constraint — proposals are actually doable in the time"
+    vars:
+      prompt: "Quick weeknight dinner, only 30 minutes from fridge to table, 2 people, intermediate, no restrictions"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "All proposed dishes have a time estimate of 30 minutes or less — no proposal exceeds the stated constraint"
+      - type: llm-rubric
+        value: "Response does NOT propose dishes that inherently take longer (e.g. braises, slow roasts, anything that needs to marinate overnight)"
+
+  # ── Learnings from real usage ────────────────────────────────────────────
+
+  - description: "seasonal ingredient — flags out-of-season item and suggests substitute proactively"
+    vars:
+      prompt: "Dinner for 2, summer caprese salad with fresh tomatoes and basil, intermediate, 20 minutes, January"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response flags that fresh field tomatoes are out of season in January without being asked, and suggests an alternative (e.g. cherry tomatoes, San Marzano, or a different seasonal approach)"
+      - type: llm-rubric
+        value: "Response does not simply proceed as if peak-season tomatoes are available in January"
+
+  - description: "collaborative dinner — calibrates portions when other mains are on the table"
+    vars:
+      prompt: "Dinner party for 8, no restrictions, advanced. Someone else is making birria as a main. How many duck breasts do I need if I'm making duck mole as a second main?"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response recommends fewer than 8 duck breasts — it accounts for birria being a second main, so full single-protein portions are not needed"
+      - type: llm-rubric
+        value: "Response explains the reasoning relative to the full table"
+
+  - description: "specialty ingredients — automatically includes tiered fallback without being asked"
+    vars:
+      prompt: >
+        Full recipe for mole negro for 6 — uses mulato, pasilla, ancho, and chipotle chiles.
+        Intermediate cook, Quebec City.
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Recipe includes a fallback note for the specialty chiles (mulato, pasilla) without the user asking — e.g. what to do if only 2 types are available"
+      - type: llm-rubric
+        value: "Fallback is specific (names which chiles to prioritize and in what quantities) — not just 'substitute with similar chiles'"
+
+  - description: "dinner party — includes plating suggestion"
+    vars:
+      prompt: "I'm making duck breast with mole for a dinner party for 6. Give me the plating instructions — how should it look on the plate?"
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response describes how to plate the dish — includes at least one detail about sauce placement, duck slice arrangement, or garnish"
+      - type: llm-rubric
+        value: "Response addresses individual plating vs family-style as an option"
+
+  - description: "kids at the table — skill adjusts spice and complexity"
+    vars:
+      prompt: "Family dinner for 4 including 2 young kids (ages 5 and 8). 45 minutes. No spicy food. Intermediate cook."
+      mode: inject
+      skill: chef:plan
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Proposed recipes are family-friendly — no spicy dishes (no chili, jalapeño, hot sauce, or intense spice as a core ingredient)"
+      - type: llm-rubric
+        value: "At least one proposal is something a child would likely enjoy (familiar flavors, not too exotic)"

@@ -1,0 +1,13 @@
+# sanity.test.yaml — quick check that verdict is wired up correctly
+
+description: Sanity check
+
+prompts:
+  - "What is 2 + 2? Reply with the number only."
+
+tests:
+  - vars:
+      mode: real
+    assert:
+      - type: llm-rubric
+        value: "Response is the number 4"

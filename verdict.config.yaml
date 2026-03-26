@@ -1,0 +1,12 @@
+# verdict config — run `verdict run` to execute all matched suites
+
+testMatch:
+  - "tests/verdict/**/*.test.yaml"
+
+# Max parallel suites
+maxWorkers: 2
+
+# Uncomment to run tests against multiple models (matrix mode):
+# models:
+#   - claude-haiku-4-5
+#   - claude-sonnet-4-6
