@@ -1,0 +1,86 @@
+---
+name: grocery-check
+description: Check this week's grocery deals from local stores. Scrapes digital flyers via Playwright and caches results until the flyer expires (Quebec flyers run Thu–Wed). Use before chef:prep or standalone to see what's on sale.
+user_invocable: true
+---
+
+# Chef Grocery Check
+
+Fetch this week's deals from the user's preferred stores. Cache results so Playwright only runs once per flyer cycle.
+
+## Cache Logic
+
+Cache file: `~/.claude/chef/flyer-cache.json`
+
+Format:
+```json
+{
+  "fetched_at": "2026-04-12T10:00:00",
+  "expires_at": "2026-04-16T23:59:59",
+  "stores": {
+    "Metro": [
+      { "item": "chicken thighs", "regular": "$6.99/kg", "sale": "$3.99/kg", "note": "limit 2" },
+      { "item": "salmon fillet", "regular": "$24.99/kg", "sale": "$16.99/kg" }
+    ],
+    "IGA": [...]
+  }
+}
+```
+
+**Before scraping, always check the cache:**
+1. Read `~/.claude/chef/flyer-cache.json`
+2. If it exists AND `expires_at` is in the future → return cached deals, skip Playwright
+3. If missing or expired → scrape, update cache, return fresh deals
+
+**Expiry calculation:** Quebec flyers run Thursday to Wednesday. Set `expires_at` to the coming Wednesday at 23:59:59. If today is Thursday or later in the week, that's this Wednesday; otherwise last Wednesday hasn't passed yet — compute accordingly.
+
+## Scraping Workflow (when cache is stale)
+
+Use Playwright MCP. Scrape each store in `preferred_stores` from config. Focus on protein, produce, and dairy — skip cleaning products, personal care, etc.
+
+### Store URLs
+
+| Store | Flyer URL |
+|---|---|
+| Metro | `https://www.metro.ca/fr/circulaire` |
+| IGA | `https://www.iga.net/fr/circulaire` |
+| Maxi | `https://www.maxi.ca/fr/circulaire` |
+| Provigo | `https://www.provigo.ca/fr/circulaire` |
+| Super C | `https://www.superc.ca/fr/circulaire` |
+
+### Per-store flow
+```
+1. browser_navigate → flyer URL
+2. browser_snapshot → identify deal cards/sections
+3. Extract: item name, regular price, sale price, any quantity limits
+4. Filter to food items only (protein, produce, dairy, pantry staples)
+5. browser_close
+```
+
+Flyer sites are JS-rendered — use Playwright, not WebFetch.
+
+If a store's flyer fails to load, skip it and note the failure. Don't block the whole run.
+
+## Output Format
+
+Always show:
+- Cache status: "Using cached deals (expires Wed Apr 16)" or "Fetched fresh deals"
+- Deals grouped by store, sorted by % discount descending
+- Flag exceptional deals (>40% off) prominently
+
+```markdown
+## This Week's Deals
+*Cached — expires Wed Apr 16*
+
+### Metro
+- **Chicken thighs** — $3.99/kg (was $6.99) ↓43%
+- Salmon fillet — $16.99/kg (was $24.99) ↓32%
+
+### IGA
+- **Ground beef (lean)** — $5.99/kg (was $9.99) ↓40%
+```
+
+## Standalone vs. Integrated
+
+- **Standalone** (`/chef:grocery-check`): show deals and stop
+- **Called by `chef:prep`**: return deals dict for meal planning — skip the formatted output, just pass data
