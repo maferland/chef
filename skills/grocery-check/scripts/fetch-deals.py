@@ -12,7 +12,7 @@ Writes to ~/.claude/chef/flyer-cache/deals.md
 Cache expires next Wednesday (Quebec flyer cycle Thu–Wed).
 """
 
-import re, sys
+import re, sys, json
 from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -261,44 +261,66 @@ def extract_iga_js(page):
     return sorted(d_filtered, key=lambda x: -x['disc']), s_filtered
 
 
-def extract_maxi_js(page):
-    """Extract Maxi deals using sale/was labels."""
-    deals = page.evaluate('''() => {
-        const results = [];
-        const cards = Array.from(document.querySelectorAll('li, article, [data-testid]'));
-        const seen = new Set();
-        cards.forEach(card => {
-            const saleEl = Array.from(card.querySelectorAll('*')).find(
-                el => el.childNodes.length === 1 && el.textContent.trim() === 'sale'
-            );
-            const wasEl = Array.from(card.querySelectorAll('*')).find(
-                el => el.childNodes.length === 1 && el.textContent.trim() === 'was'
-            );
-            if (!saleEl || !wasEl) return;
-            // Price is sibling text node
-            const salePrice = saleEl.nextSibling?.textContent?.trim() ||
-                              saleEl.parentElement?.querySelector('text')?.textContent;
-            const wasPrice = wasEl.nextSibling?.textContent?.trim();
-            const nameEl = card.querySelector('h3, h2, [class*="title"]');
-            if (!nameEl || !salePrice || !wasPrice) return;
-            const name = nameEl.textContent.trim();
-            if (seen.has(name)) return;
-            seen.add(name);
-            const sv = parseFloat(salePrice.replace('$','').trim());
-            const wv = parseFloat(wasPrice.replace('$','').trim());
-            const disc = Math.round((1-sv/wv)*100);
-            results.push({ name: name.substring(0,65), sale: salePrice, reg: wasPrice, disc });
-        });
-        return results;
-    }''')
-
+def extract_maxi_via_api(page, request_body, request_headers):
+    """Paginate through Maxi's flyersPage POST API to get all flyer deals."""
+    deals = []
     seen = set()
-    filtered = []
-    for item in deals:
-        if item['name'] in seen: continue
-        seen.add(item['name'])
-        filtered.append(item)
-    return sorted(filtered, key=lambda x: -x['disc'])
+    page_num = 1
+    from_idx = 1
+    page_size = 48
+
+    # Use all original headers — the PCExpress API requires the full auth context
+    api_headers = request_headers
+
+    while True:
+        body = dict(request_body)
+        body['listingInfo'] = dict(body.get('listingInfo', {}))
+        body['listingInfo']['pagination'] = {'from': from_idx}
+        body['listingInfo']['includeFiltersInResponse'] = (page_num == 1)
+
+        # Do extraction in JS — pass headers and body as args to avoid f-string escaping issues
+        page_result = page.evaluate('''async ({hdrs, bdy, maxDisc}) => {
+            const r = await fetch('https://api.pcexpress.ca/pcx-bff/api/v2/flyersPage', {
+                method: 'POST', headers: hdrs, body: JSON.stringify(bdy)
+            });
+            const data = await r.json();
+            try {
+                const tiles = data.layout.sections.productListingSection.components[0].data.productGrid.productTiles;
+                const pagination = data.layout.sections.productListingSection.components[0].data.productGrid.pagination;
+                const deals = tiles
+                    .filter(t => t.pricing && t.pricing.wasPrice)
+                    .map(t => {
+                        const brand = t.brand || '';
+                        const name = brand ? brand + ' ' + t.title : t.title;
+                        const sv = parseFloat(t.pricing.price);
+                        const wv = parseFloat(String(t.pricing.wasPrice).replace(',', '.').replace(/[\\s\\xa0\\$]/g, ''));
+                        const disc = Math.round((1 - sv/wv)*100);
+                        return { name: name.substring(0, 65), sale: '$' + sv.toFixed(2), reg: '$' + wv.toFixed(2), disc };
+                    })
+                    .filter(d => d.disc > 0 && d.disc <= maxDisc);
+                return { deals, hasMore: pagination ? !!pagination.hasMore : false };
+            } catch(e) {
+                return { deals: [], hasMore: false, error: e.message };
+            }
+        }''', {'hdrs': api_headers, 'bdy': body, 'maxDisc': MAX_DISC})
+
+        new_items = 0
+        for item in page_result.get('deals', []):
+            if item['name'] not in seen:
+                seen.add(item['name'])
+                deals.append(item)
+                new_items += 1
+
+        print(f'    Page {page_num}: +{new_items} deals (total {len(deals)})', end='\r')
+
+        if not page_result.get('hasMore'):
+            break
+
+        from_idx += page_size
+        page_num += 1
+
+    print(f'\n    Done: {len(deals)} deals across {page_num} pages')
+    return sorted(deals, key=lambda x: -x['disc'])
 
 
 def dismiss_dialogs(page):
@@ -313,17 +335,26 @@ def dismiss_dialogs(page):
 def scrape_store(page, name, config):
     print(f'\n  {name}...')
     stype = config['type']
+
+    # Maxi: set up API listener BEFORE navigation so we capture the flyersPage POST
+    if stype == 'maxi':
+        maxi_req = {'body': None, 'headers': None}
+        def capture_maxi(request):
+            if 'flyersPage' in request.url and request.method == 'POST':
+                try:
+                    maxi_req['body'] = request.post_data_json
+                    maxi_req['headers'] = dict(request.headers)
+                except: pass
+        page.on('request', capture_maxi)
+
     page.goto(config['url'], wait_until='domcontentloaded', timeout=30000)
     page.wait_for_timeout(3000)
     dismiss_dialogs(page)
 
     if stype == 'iga':
-        try:
-            page.locator('#tab-1').click(timeout=2000)
-            page.wait_for_timeout(2000)
-            dismiss_dialogs(page)
-        except:
-            pass
+        # URL already has ?view=list which selects grid tab — no click needed
+        page.wait_for_timeout(2000)
+        dismiss_dialogs(page)
 
     if stype == 'maxi':
         page.wait_for_timeout(2000)
@@ -332,7 +363,24 @@ def scrape_store(page, name, config):
     if stype in ('metro', 'superc'):
         page.wait_for_timeout(2000)
         return paginate_and_extract(page, config['url'], stype)
+    elif stype == 'maxi':
+        page.wait_for_timeout(2000)  # wait for flyersPage POST to fire after store confirmation
+        if maxi_req['body']:
+            store_id = maxi_req['body'].get('fulfillmentInfo', {}).get('storeId', '?')
+            print(f'    Using POST API (store {store_id})')
+            return extract_maxi_via_api(page, maxi_req['body'], maxi_req['headers'])
+        else:
+            print('    flyersPage POST not captured')
+            return []
     elif stype == 'iga':
+        # Verify products loaded before starting click loop
+        initial = page.evaluate("() => document.querySelectorAll(\"a[href*='/fr/produits/']\").length")
+        if initial == 0:
+            print(f'    IGA: no products loaded, retrying grid tab...')
+            try:
+                page.locator('#tab-1').click(timeout=3000)
+                page.wait_for_timeout(3000)
+            except: pass
         # Scroll to bottom first, then click "Charger plus" via JS until it disappears
         clicks = 0
         while clicks < 60:
