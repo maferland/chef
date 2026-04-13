@@ -102,26 +102,30 @@ Pattern in snapshot (English labels):
 Note: lazy-loads ~20 items on first view. Accept partial results or scroll for more.
 ```
 
-### IGA
+### IGA — grid view has real sale prices
 
 ```
-URL: https://www.iga.net/fr/offres
+URL: https://www.iga.net/fr/circulaire?view=list
+(or navigate to /fr/circulaire, dismiss tour, click second tab)
 
-1. browser_navigate → URL
+1. browser_navigate → https://www.iga.net/fr/circulaire?view=list
 2. browser_wait_for (time: 4)
-3. Accept cookies if dialog present
-4. Dismiss tour modal if appears (click "Sauter")
-5. Click "Plus d'offres" tab
-6. browser_wait_for (time: 2)
-7. browser_snapshot → extract deals
+3. Accept cookies if dialog appears ("Tout accepter")
+4. Dismiss tour modal if present ("Sauter" / "Fermer")
+5. browser_snapshot → extract deals
 
-Pattern in snapshot:
-  generic: PRICE ($X,XX $)  → +TPS +TVQ line nearby
-  paragraph → cursor=pointer: PRODUCT_NAME
+Two item types in grid:
 
-Note: IGA's "Plus d'offres" shows Scene+ loyalty bonus deals — product is at regular price
-but you earn bonus points. This is different from Metro/Super C sale prices.
-Flag IGA deals as "Scene+ offer" not "% off regular price".
+a) SALE items — identified by ÉCONOMISEZ marker:
+   Pattern: generic: SALE_PRICE $ → generic: WAS_PRICE $ → ÉCONOMISEZ → generic: SAVINGS $
+   Extract sale price, compute % = (1 - sale/was) × 100
+
+b) Scene+ bonus items — identified by +TPS +TVQ after price:
+   Pattern: generic: PRICE $ → paragraph: +TPS +TVQ → Achetez N et obtenez X PTS
+   Extract: product + price + bonus points offer
+
+Note: page lazy-loads ~20 items. Scroll or accept partial results.
+In output, separate real discounts (ÉCONOMISEZ) from Scene+ bonus items.
 ```
 
 ### Stores without text-extractable flyers
@@ -134,7 +138,7 @@ If a store isn't listed above, skip it and note: "flyer not text-accessible for 
 
 - **Food items only**: protein, produce, dairy, pantry staples — skip cleaning products, personal care, beer/wine unless in preferred_stores config
 - **Flag exceptional deals**: >40% off shown prominently
-- **IGA caveat**: note these are Scene+ bonus offers, not price reductions
+- **IGA**: distinguish ÉCONOMISEZ (real discount) from Scene+ bonus items (regular price + points)
 - **Failures**: if a store fails or returns no deals, skip and note — don't block the run
 
 ---
@@ -156,8 +160,9 @@ If a store isn't listed above, skip it and note: "flyer not text-accessible for 
 - **Filets d'aiglefin** — $11.99 (was $19.99) ↓40%
 - Poulet BBQ — $4.99 (was $6.49) ↓23%
 
-### IGA *(Scene+ offers — bonus points, not discounted prices)*
-- Tostitos 525g — $6.99 (+500 pts)
+### IGA
+- **McCain Superfries 650g** — $2.99 ↓50% (was $5.99)
+- Tostitos 525g — $6.99 *(+250 pts Scene+)*
 ```
 
 **Integrated mode** (called by `chef:prep`): return deals data directly, skip formatted output.
