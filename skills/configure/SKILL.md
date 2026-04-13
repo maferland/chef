@@ -21,6 +21,7 @@ Walk through each field interactively, showing the current value if one exists:
 | `cuisine_preference` | Favourite cuisines | `French, Italian, Japanese` |
 | `skill_level` | Cooking confidence | `beginner`, `intermediate`, `advanced` |
 | `oven_temp_unit` | Preferred unit for oven temps | `fahrenheit` (default), `celsius` |
+| `health_goals` | Weekly eating goals for meal prep | `balanced`, `high_protein`, `plant_forward`, `low_carb`, `light` |
 
 ## Workflow
 
@@ -51,6 +52,7 @@ people: 2
 cuisine_preference: French, Italian, Japanese
 skill_level: intermediate
 oven_temp_unit: fahrenheit
+health_goals: balanced
 ---
 ```
 
