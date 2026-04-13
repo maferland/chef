@@ -32,7 +32,16 @@ Format:
 2. If it exists AND `expires_at` is in the future → return cached deals, skip Playwright
 3. If missing or expired → scrape, update cache, return fresh deals
 
-**Expiry calculation:** Quebec flyers run Thursday to Wednesday. Set `expires_at` to the coming Wednesday at 23:59:59. If today is Thursday or later in the week, that's this Wednesday; otherwise last Wednesday hasn't passed yet — compute accordingly.
+**Expiry calculation:** Quebec flyers run Thursday to Wednesday. Set `expires_at` to the next Wednesday at 23:59:59 (if today is Wednesday, expires tonight):
+```python
+from datetime import datetime, timedelta
+today = datetime.now()
+# Wednesday = weekday 2 (Mon=0 … Sun=6)
+days_until_wed = (2 - today.weekday()) % 7
+if days_until_wed == 0:
+    days_until_wed = 7  # today is Wednesday — already the last day, expires tonight
+expires = (today + timedelta(days=days_until_wed)).replace(hour=23, minute=59, second=59)
+```
 
 ## Scraping Workflow (when cache is stale)
 
@@ -51,13 +60,15 @@ Use Playwright MCP. Scrape each store in `preferred_stores` from config. Focus o
 ### Per-store flow
 ```
 1. browser_navigate → flyer URL
-2. browser_snapshot → identify deal cards/sections
-3. Extract: item name, regular price, sale price, any quantity limits
-4. Filter to food items only (protein, produce, dairy, pantry staples)
-5. browser_close
+2. browser_snapshot → read the visual layout (flyer sites vary by store; use visual parsing)
+3. Look for deal cards: each card typically has a product name, sale price, and regular/was price
+4. If cards aren't obvious from snapshot, take a screenshot and extract visually
+5. Extract: item name, regular price, sale price, any quantity limits
+6. Filter to food items only (protein, produce, dairy, pantry staples)
+7. browser_close
 ```
 
-Flyer sites are JS-rendered — use Playwright, not WebFetch.
+Flyer sites are JS-rendered — use Playwright, not WebFetch. DOM structure varies across stores; rely on visual/snapshot parsing rather than fixed CSS selectors. If a store's layout changes, fall back to a screenshot and extract what's visible.
 
 If a store's flyer fails to load, skip it and note the failure. Don't block the whole run.
 
@@ -83,4 +94,5 @@ Always show:
 ## Standalone vs. Integrated
 
 - **Standalone** (`/chef:grocery-check`): show deals and stop
+- **Standalone with force-refresh** (`/chef:grocery-check force-refresh`): bypass cache, re-scrape all stores
 - **Called by `chef:prep`**: return deals dict for meal planning — skip the formatted output, just pass data
