@@ -22,6 +22,9 @@ Walk through each field interactively, showing the current value if one exists:
 | `skill_level` | Cooking confidence | `beginner`, `intermediate`, `advanced` |
 | `oven_temp_unit` | Preferred unit for oven temps | `fahrenheit` (default), `celsius` |
 | `health_goals` | Weekly eating goals for meal prep | `balanced`, `high_protein`, `plant_forward`, `low_carb`, `light` |
+| `prep_days` | Days to prep for each week | `4` (Mon–Thu default) |
+| `prep_extras` | Extra portions per meal beyond `people` (e.g. packed lunches) | `0` default, `1` for one next-day lunch |
+| `prep_time` | Available prep session time | `2h30` default |
 
 ## Workflow
 
@@ -53,6 +56,9 @@ cuisine_preference: French, Italian, Japanese
 skill_level: intermediate
 oven_temp_unit: fahrenheit
 health_goals: balanced
+prep_days: 4
+prep_extras: 0
+prep_time: 2h30
 ---
 ```
 
