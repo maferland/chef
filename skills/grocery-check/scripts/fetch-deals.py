@@ -41,6 +41,7 @@ STORES = {
 
 SKIP_KW = ['détergent','shampoo','savon','litière','couche','nettoyant',
            'lave-vaisselle','mouchoir','antisudorifique']
+MAX_DISC = 85  # discard apparent discounts > 85% (bottle deposits, data artifacts)
 
 
 def next_wednesday():
@@ -126,9 +127,10 @@ def extract_metro_superc_js(page, store_type):
             }});
             if (!name) return;
 
-            // Extract all prices from the tile
+            // Extract all prices from the tile, filtering out deposits (< $1.00)
             const prices = [...tile.textContent.matchAll(/(\\d+[,]\\d+)\\s*\\$/g)]
-                .map(m => parseFloat(m[1].replace(',', '.')));
+                .map(m => parseFloat(m[1].replace(',', '.')))
+                .filter(p => p >= 1.0);  // exclude bottle deposits ($0.10-$0.30)
             if (prices.length < 2) return;
 
             const reg = Math.max(prices[0], prices[1]);
@@ -152,6 +154,7 @@ def extract_metro_superc_js(page, store_type):
         name = item['name'].strip()
         if name in seen: continue
         if any(k in name.lower() for k in SKIP_KW): continue
+        if item['disc'] > MAX_DISC: continue  # filter bottle deposit artifacts
         seen.add(name)
         item['name'] = name
         filtered.append(item)
@@ -170,28 +173,43 @@ def extract_iga_js(page):
                   el.textContent.trim() === 'ÉCONOMISEZ'
         );
         labels.forEach(label => {
-            let card = label.parentElement;
+            let card = label;
             for (let i = 0; i < 8; i++) {
-                if (!card) break;
-                if (card.querySelectorAll('a[href*="/fr/produits/"]').length > 0) break;
+                if (!card.parentElement) break;
                 card = card.parentElement;
+                if (card.textContent.length > 50 && card.textContent.length < 600) break;
             }
-            if (!card) return;
-            const nameEl = card.querySelector('[class*="cursor-pointer"], a[href*="/fr/produits/"]');
-            if (!nameEl) return;
-            const name = nameEl.textContent.trim();
-            const prices = [...card.textContent.matchAll(/(\\d+[,]\\d+)\\s*\\$/g)].map(
-                m => parseFloat(m[1].replace(',','.'))
-            );
+            // Normalize non-breaking spaces, extract prices >= $1
+            const text = card.textContent.replace(/\xa0/g, ' ');
+            const prices = [...text.matchAll(/(\\d+[,]\\d+)\\s*\\$/g)]
+                .map(m => parseFloat(m[1].replace(',','.')))
+                .filter(p => p >= 1.0);
             if (prices.length < 2) return;
-            const sale = Math.min(...prices.slice(0, 2));
-            const was = Math.max(...prices.slice(0, 2));
+            const sale = Math.min(prices[0], prices[1]);
+            const was = Math.max(prices[0], prices[1]);
+            if (sale >= was) return;
+            // Product name: strip price+label prefix, take the trailing product text
+            // Pattern: "SALE $WAS $ÉCONOMISEZ SAVINGS $SIZE NAMEBrand Product Name SIZE"
+            let name = text
+                .replace(/\\d+[,\\.]+\\d+\\s*\\$/g, '')  // remove prices
+                .replace(/ÉCONOMISEZ/g, '')
+                .replace(/\\(.*?\\)/g, '')  // remove parenthetical unit prices
+                .replace(/[A-Z]+\\s*G\\s*\\(.*?\\)/g, '')  // remove "340 G (...)"
+                .replace(/Ajouter[^A-Z]*/g, '')
+                .replace(/favoris|panier|liste/gi, '')
+                .replace(/\\s+/g, ' ')
+                .trim();
+            // Take the last meaningful segment (product name tends to be at the end)
+            const parts = name.split(/(?=[A-Z][a-z])/);
+            name = parts.slice(-1)[0]?.trim() || name.substring(0, 65);
+            if (!name || name.length < 5) return;
             const disc = Math.round((1 - sale/was)*100);
+            if (disc <= 0 || disc > 85) return;
             results.push({
                 name: name.substring(0, 65),
                 sale: sale.toFixed(2).replace('.', ',') + ' $',
                 reg: was.toFixed(2).replace('.', ',') + ' $',
-                disc: disc
+                disc
             });
         });
         return results;
@@ -284,7 +302,7 @@ def extract_maxi_js(page):
 
 
 def dismiss_dialogs(page):
-    for text in ['Accept All', 'Tout accepter', 'Oui', 'Sauter', 'Fermer', 'Close Tour']:
+    for text in ['Accept All', 'Tout accepter', 'Tout Accepter', 'Oui', 'Sauter', 'Fermer', 'Close Tour', 'Skip Tour']:
         try:
             page.get_by_role('button', name=text).click(timeout=1500)
             page.wait_for_timeout(400)
@@ -315,6 +333,24 @@ def scrape_store(page, name, config):
         page.wait_for_timeout(2000)
         return paginate_and_extract(page, config['url'], stype)
     elif stype == 'iga':
+        # Scroll to bottom first, then click "Charger plus" via JS until it disappears
+        clicks = 0
+        while clicks < 60:
+            page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+            page.wait_for_timeout(1000)
+            clicked = page.evaluate('''() => {
+                const btn = Array.from(document.querySelectorAll("button"))
+                    .find(b => b.textContent.trim() === "Charger plus");
+                if (btn) { btn.click(); return true; }
+                return false;
+            }''')
+            if not clicked:
+                break
+            page.wait_for_timeout(1500)
+            clicks += 1
+            count = page.evaluate("() => document.querySelectorAll(\"a[href*='/fr/produits/']\").length")
+            print(f'    Load more {clicks}: {count} products', end='\r')
+        print(f'\n    Done: {clicks} loads')
         return extract_iga_js(page)
     elif stype == 'maxi':
         return extract_maxi_js(page)
