@@ -6,3 +6,5 @@ sessions/
 .verdict-history.json
 .verdict-runs/
 .claude/
+.worktrees/
+__pycache__/

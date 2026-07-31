@@ -1,0 +1,81 @@
+# chef-publish.test.yaml
+#
+# Tests for the chef:publish skill.
+# Key behaviors:
+#   - Reads a saved chef:plan session rather than re-deriving recipe content
+#   - Always uses --dry-run first when debugging, never claims success without it
+#   - Refuses chef:prep sessions with a clear reason (no per-meal ingredients/steps)
+#   - Surfaces script errors verbatim (auth, missing files) instead of guessing
+
+description: chef:publish session mapping and failure handling
+
+requires:
+  skills: [chef:publish]
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  - description: "describes reading the existing session, not re-generating the recipe"
+    vars:
+      prompt: "Publish my duck mole session to mise."
+      mode: inject
+      skill: chef:publish
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response describes running the publish script against the existing session's plan.md — it does not re-propose or regenerate the recipe"
+      - type: llm-rubric
+        value: "Response mentions MISE_BASE_URL and/or MISE_API_KEY as required environment configuration"
+
+  - description: "recommends --dry-run before a real publish when the mapping hasn't been checked"
+    vars:
+      prompt: "I just ran chef:plan for a weeknight dinner, can you send it to mise now?"
+      mode: inject
+      skill: chef:publish
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response mentions or uses --dry-run to preview the mapped payload"
+      - type: javascript
+        value: "!output.toLowerCase().includes('published successfully')"
+
+  - description: "refuses a chef:prep session with the real reason, not a fabricated recipe"
+    vars:
+      prompt: "Publish this week's chef:prep meal plan to mise as a collection."
+      mode: inject
+      skill: chef:publish
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response explains that chef:prep sessions aren't supported because they lack per-meal ingredients and steps — it does NOT invent ingredients or steps to force a publish"
+      - type: llm-rubric
+        value: "Response does NOT claim the week was published to mise"
+
+  - description: "surfaces a script failure verbatim instead of claiming success"
+    vars:
+      prompt: "Publish my session to mise — I haven't set up any API key yet."
+      mode: inject
+      skill: chef:publish
+      env:
+        disableSkills: true
+        noMcp: true
+        pluginDir: /Users/marc-antoine.ferland/dev/chef
+        sessionDir: /tmp/chef-tests
+    assert:
+      - type: llm-rubric
+        value: "Response explains that MISE_API_KEY (and/or MISE_BASE_URL) needs to be set before publishing can work"
+      - type: javascript
+        value: "!output.toLowerCase().includes('published successfully') && !output.toLowerCase().includes('published to mise successfully')"
